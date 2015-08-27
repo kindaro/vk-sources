@@ -8,17 +8,12 @@ url = require 'url'
 # vk.com resources discussion topic.
 # ----------------------------------
 topic =
-    group_id: 2158488
-    topic_id: 3207643
-    offset: 0
-    count: 100
-
-# Just some random rather short topic.
-# ------------------------------------
-# topic =
-#     group_id: 96836518
-#     topic_id: 32588806
-
+    param:
+        group_id: 2158488
+        topic_id: 3207643
+        offset: 0
+        count: 100
+    value: []
 
 isUrl = (line) ->
     p = /\b((?:https?:\/\/|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}\/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’]))/i
@@ -32,13 +27,17 @@ isJs = (line) ->
 vk_api_get = (method, args, callback) ->
     request = require 'request'
     url = require 'url'
-    request (
-        url.format
-            protocol: 'https'
-            hostname: 'api.vk.com'
-            pathname: 'method/' + method
-            query: args
-        )
+    request_constructor =
+        url:
+            url.format
+                protocol: 'https'
+                hostname: 'api.vk.com'
+                pathname: 'method/' + method
+                query: args
+        timeout: 2000
+    console.log request_constructor
+
+    request request_constructor
         , (error, response, body) ->
             if (!error && response.statusCode == 200)
                 corpus = JSON.parse body
@@ -46,15 +45,13 @@ vk_api_get = (method, args, callback) ->
                     console.log corpus.error.error_msg
                 else
                     callback corpus
-
-loop_over_topic = (iterator, collection, condition) ->
-    if condition iterator
-        vk_api_get 'board.getComments', iterator, (corpus) ->
-            loop_over_topic extend( iterator, { offset: iterator.offset + iterator.count } )
-                , (collection.concat corpus.response.comments.slice(1))
-                , condition
-    else
-        process_collection collection
+            else
+                if error
+                    console.log 'error ' + error
+                    vk_api_get method, args, callback
+                else
+                    console.log 'status ' + response.statusCode
+                    vk_api_get method, args, callback
 
 process_collection = (collection) ->
     v = collection
@@ -67,9 +64,20 @@ process_collection = (collection) ->
         .filter isJs
     console.log v
 
-enter = () -> 
-    vk_api_get 'board.getComments', topic, (corpus) ->
-        loop_over_topic topic, [], (iterator) -> iterator.offset < corpus.response.comments[0]
+mkIterator = (callback) ->
+    vk_api_get 'board.getComments', topic.param, (corpus) ->
+        topic.check = () -> this.param.offset < corpus.response.comments[0]
+        topic.increment = (x) ->
+            this.value = this.value.concat x.response.comments.slice(1)
+            this.param.offset += this.param.count
+            this
+        topic.evaluate = () ->
+            if this.check()
+                console.log 'state: ' + this.param.offset, this.check()
+                vk_api_get 'board.getComments', this.param, (corpus) -> topic.increment(corpus).evaluate()
+            else
+                console.log this.param.offset, this.check()
+                callback this.value
+        topic.evaluate()
 
-enter()
-
+mkIterator(process_collection)
