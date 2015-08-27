@@ -7,13 +7,15 @@ url = require 'url'
 
 # vk.com resources discussion topic.
 # ----------------------------------
-group =
+topic =
     group_id: 2158488
     topic_id: 3207643
+    offset: 0
+    count: 100
 
 # Just some random rather short topic.
 # ------------------------------------
-# group =
+# topic =
 #     group_id: 96836518
 #     topic_id: 32588806
 
@@ -45,14 +47,12 @@ vk_api_get = (method, args, callback) ->
                 else
                     callback corpus
 
-collect_comments = (corpus, offset, collection) ->
-    console.log corpus.response.comments[0] + ' -- ' + offset
-    if offset < corpus.response.comments[0]
-        vk_api_get 'board.getComments'
-            , extend(group, {offset: offset, count: 100})
-            , (corpus) -> collect_comments corpus
-                , offset + 100
-                , collection.concat corpus.response.comments.slice(1)
+loop_over_topic = (iterator, collection, condition) ->
+    if condition iterator
+        vk_api_get 'board.getComments', iterator, (corpus) ->
+            loop_over_topic extend( iterator, { offset: iterator.offset + iterator.count } )
+                , (collection.concat corpus.response.comments.slice(1))
+                , condition
     else
         process_collection collection
 
@@ -65,9 +65,11 @@ process_collection = (collection) ->
         .map entities.decode
         .filter isUrl
         .filter isJs
-    console.log v.length
+    console.log v
 
-enter = vk_api_get 'board.getComments'
-    , extend(group, {offset: 0, count: 0})
-    , (corpus) -> collect_comments corpus, 0, []
+enter = () -> 
+    vk_api_get 'board.getComments', topic, (corpus) ->
+        loop_over_topic topic, [], (iterator) -> iterator.offset < corpus.response.comments[0]
+
+enter()
 
