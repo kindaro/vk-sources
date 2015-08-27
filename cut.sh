@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh -e
 
 cut () {
 	mv -v "$1" "${1%\?*}"
