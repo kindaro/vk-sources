@@ -49,7 +49,7 @@ collect_comments = (corpus, offset, collection) ->
     console.log corpus.response.comments[0] + ' -- ' + offset
     if offset < corpus.response.comments[0]
         vk_api_get 'board.getComments'
-            , extend(group, {offset: 0, count: 100})
+            , extend(group, {offset: offset, count: 100})
             , (corpus) -> collect_comments corpus
                 , offset + 100
                 , collection.concat corpus.response.comments.slice(1)
