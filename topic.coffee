@@ -1,14 +1,13 @@
 #!/usr/bin/env coffee
 
-extend = require('util')._extend
+extend      = require('util')._extend
 XmlEntities = require('html-entities').XmlEntities
-entities = new XmlEntities
-url = require 'url'
-esprima = require 'esprima'
-fs = require 'fs'
-async = require 'async'
-_ = require 'lodash'
-
+entities    = new XmlEntities
+url         = require 'url'
+esprima     = require 'esprima'
+fs          = require 'fs'
+async       = require 'async'
+_           = require 'lodash'
 
 # vk.com resources discussion topic.
 # ----------------------------------
@@ -72,10 +71,10 @@ js_get = (my_url, callback) ->
                 mk_path_and_write_data_to_a_file my_path, body, {prefix: 'topic.d'}, callback
             else
                 if error
-                    console.log 'request error ' + error
+                    console.log 'file: ' + my_url + 'request error ' + error
                     js_get my_url, callback
                 else
-                    console.log 'request status ' + response.statusCode
+                    console.log 'file: ' + my_url + ' -- request status ' + response.statusCode
 
 process_collection = (collection) ->
     i = 0
@@ -91,9 +90,6 @@ process_collection = (collection) ->
     l = s.length
     s .map (url) -> js_get url, () ->
         ++i
-
-
-
 
 run = () ->
     vk_api_get 'board.getComments', topic.param, mkIter
@@ -155,4 +151,4 @@ mk_path_and_write_data_to_a_file = (path, contents, options, callback) ->
         , () ->
             fs.writeFile (path_parts.join '/'), contents, callback
 
-# mk_path_and_write_data_to_a_file 'a/b/c/d', 'lalafa', {prefix: 'topic.d'}, console.log
+
