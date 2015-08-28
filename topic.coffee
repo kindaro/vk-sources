@@ -6,6 +6,8 @@ entities = new XmlEntities
 url = require 'url'
 esprima = require 'esprima'
 fs = require 'fs'
+async = require 'async'
+_ = require 'lodash'
 
 
 # vk.com resources discussion topic.
@@ -38,7 +40,8 @@ vk_api_get = (method, args, callback) ->
                 pathname: 'method/' + method
                 query: args
         timeout: 2000
-    console.log request_constructor
+
+    debugger
 
     request request_constructor
         , (error, response, body) ->
@@ -56,27 +59,6 @@ vk_api_get = (method, args, callback) ->
                     console.log 'status ' + response.statusCode
                     vk_api_get method, args, callback
 
-mkdirp = (path, callback) ->
-    path_parts = path.split '/'
-                        .slice(1,-1)
-                        .reduce (ys, y, i, xs) ->
-                            ys.push (xs.slice 0, i + 1) .join '/'
-                            ys
-                        , []
-    f = (list_of_paths) ->
-        if list_of_paths.length > 0
-            p = list_of_paths[0]
-            ps = list_of_paths.slice(1)
-            fs.stat p, (err, stats) ->
-                if err
-                    console.log p
-                    # fs.mkdir p
-            f ps
-        else
-            callback()
-
-    f path_parts
-
 js_get = (my_url, callback) ->
 
     if !/^http/.test my_url
@@ -87,23 +69,14 @@ js_get = (my_url, callback) ->
     request = require 'request'
     request {url: my_url, timeout: 2000}, (error, response, body) ->
             if (!error && response.statusCode == 200)
-                # try
-                #     corpus = esprima.parse body # this is where we fail
-                # catch error
-                #     console.log error
-                mkdirp my_path, () ->
-                    fs.writeFile './' + my_path
-                        , body
-                        , (err) ->
-                            if err
-                                throw err
-                            console.log 'written ' + my_path
+                mk_path_and_write_data_to_a_file my_path, body, {prefix: 'topic.d'}, callback
             else
                 if error
                     console.log 'request error ' + error
                     js_get my_url, callback
                 else
                     console.log 'request status ' + response.statusCode
+
 process_collection = (collection) ->
     i = 0
     s = collection
@@ -118,8 +91,6 @@ process_collection = (collection) ->
     l = s.length
     s .map (url) -> js_get url, () ->
         ++i
-        if i = l
-            console.log 'done!'
 
 
 
@@ -142,4 +113,46 @@ mkIter = (corpus) ->
 
 run()
 
+mk_path_and_write_data_to_a_file = (path, contents, options, callback) ->
 
+    path_parts = path.split '/'
+
+    if options.absolute
+        if path_parts[0] == ''
+            path_absolute = true
+            path_parts = path_parts.slice 1
+    else
+        if path_parts[0] == ''
+            path_parts[0] = '.'
+
+    if options.prefix
+        path_parts = [options.prefix] .concat (path_parts)
+
+
+    path_parents =
+        path_parts
+            .slice(0,-1)
+            .reduce (ys, y, i, xs) ->
+                    ys.push (xs.slice 0, i + 1) .join '/'
+                    ys
+                , []
+
+    if path_absolute
+        path_parents = path_parents .map (path) -> '/' + path
+
+    async.each path_parents
+        , (path_parent, callback) ->
+            fs.exists path_parent, (flag) ->
+                if flag
+                    true
+                    callback()
+                else
+                    debugger
+                    console.log 'mkdir ', path_parent
+                    fs.mkdir path_parent, () ->
+                        console.log 'mkdir called back! '
+                        callback()
+        , () ->
+            fs.writeFile (path_parts.join '/'), contents, callback
+
+# mk_path_and_write_data_to_a_file 'a/b/c/d', 'lalafa', {prefix: 'topic.d'}, console.log
